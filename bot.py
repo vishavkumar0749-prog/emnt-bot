@@ -3,8 +3,7 @@ import os
 from telegram import (
     Update,
     InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    CopyTextButton
+    InlineKeyboardButton
 )
 from telegram.ext import (
     ApplicationBuilder,

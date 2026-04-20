@@ -1,25 +1,22 @@
 import json
 import os
-from telegram import (
-    Update,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton
-)
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     ContextTypes,
     CallbackQueryHandler,
     MessageHandler,
-    filters
+    filters,
 )
 
 TOKEN = "8693628855:AAGFIErbyJVsUI9PxD0hozZhv_q8R66kGj4"
 ADMIN_ID = 8593936230
 
-DEPOSIT_ADDRESS = "3emTg6qi7aXiiRNRvG75Bo6..."
+DEPOSIT_ADDRESS = "3emTg6qi7aXiiRNRvG75Bo6HDgPXnF32WnyPNoPjGURM"
 CHAIN_NAME = "Solana"
 
+PRICE_PER_EMNT = 0.5
 MAX_LIMIT = 500000000
 REF_BONUS = 0.1
 REF_BUY_COMMISSION_PERCENT = 5
@@ -45,7 +42,7 @@ def save_data():
 db = load_data()
 
 
-def ensure_user(uid):
+def ensure_user(uid: int) -> str:
     uid = str(uid)
     if uid not in db["users"]:
         db["users"][uid] = {
@@ -59,28 +56,27 @@ def ensure_user(uid):
     return uid
 
 
-def mask_address(addr):
+def mask_address(addr: str) -> str:
     if len(addr) <= 12:
         return addr
     return addr[:6] + "......" + addr[-6:]
 
 
-def get_latest_pending_buy(uid):
-    uid = str(uid)
+def get_latest_pending_buy(uid: str):
     pending = [r for r in db["buy"] if r["u"] == uid and r["s"] == "pending_payment"]
     if not pending:
         return None
     return sorted(pending, key=lambda x: x["id"], reverse=True)[0]
 
 
-def find_buy_request(rid):
+def find_buy_request(rid: int):
     for r in db["buy"]:
         if r["id"] == rid:
             return r
     return None
 
 
-def find_withdraw_request(rid):
+def find_withdraw_request(rid: int):
     for r in db["withdraw"]:
         if r["id"] == rid:
             return r
@@ -94,12 +90,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             ref = str(int(context.args[0]))
             if ref != uid and db["users"][uid]["by"] is None:
-                ensure_user(ref)
+                ensure_user(int(ref))
                 db["users"][uid]["by"] = ref
                 db["users"][ref]["bal"] += REF_BONUS
                 db["users"][ref]["ref"] += 1
                 save_data()
-        except:
+        except Exception:
             pass
 
     await update.message.reply_text(
@@ -117,13 +113,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = ensure_user(update.effective_user.id)
     u = db["users"][uid]
-    emnt_balance = u["bal"]
-    usdt_value = emnt_balance * 0.5
+    usdt_value = u["bal"] * PRICE_PER_EMNT
 
     await update.message.reply_text(
         "EMNT Pre-Sale\n"
         "First Phase\n\n"
-        f"Balance: {emnt_balance} EMNT\n"
+        f"Balance: {u['bal']} EMNT\n"
         f"Equal To: {usdt_value} USDT\n"
         f"Referrals: {u['ref']}"
     )
@@ -135,8 +130,8 @@ async def refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     link = f"https://t.me/{bot.username}?start={uid}"
 
     await update.message.reply_text(
-        f"EMNT Pre-Sale\n"
-        f"First Phase\n\n"
+        "EMNT Pre-Sale\n"
+        "First Phase\n\n"
         f"Your Referral Link:\n{link}\n\n"
         f"Signup Reward: {REF_BONUS} EMNT\n"
         f"Buy Commission: {REF_BUY_COMMISSION_PERCENT}%"
@@ -150,7 +145,7 @@ async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "EMNT Pre-Sale\n"
         "First Phase\n\n"
         "Buy EMNT\n"
-        "Price: 1 EMNT = 0.5 USDT\n"
+        f"Price: 1 EMNT = {PRICE_PER_EMNT} USDT\n"
         "Maximum Buy Limit: 50,00,00,000 EMNT\n\n"
         f"Deposit Address:\n{masked}\n\n"
         f"Full Deposit Address:\n{DEPOSIT_ADDRESS}\n\n"
@@ -158,7 +153,7 @@ async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Step 1:\n"
         "/buyrequest amount\n\n"
         "Step 2:\n"
-        "After payment, just send your real blockchain hash id directly in chat"
+        "After payment, send your blockchain hash id directly in chat"
     )
 
 
@@ -171,7 +166,7 @@ async def buyrequest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         amt = float(context.args[0])
-    except:
+    except Exception:
         await update.message.reply_text("Invalid amount")
         return
 
@@ -183,9 +178,9 @@ async def buyrequest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Maximum buy limit is 50,00,00,000 EMNT")
         return
 
-    required_usdt = amt * 0.5
-
+    required_usdt = amt * PRICE_PER_EMNT
     rid = len(db["buy"]) + 1
+
     db["buy"].append({
         "id": rid,
         "u": uid,
@@ -196,8 +191,6 @@ async def buyrequest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     })
     save_data()
 
-    masked = mask_address(DEPOSIT_ADDRESS)
-
     await update.message.reply_text(
         "EMNT Pre-Sale\n"
         "First Phase\n\n"
@@ -205,11 +198,9 @@ async def buyrequest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Request ID: {rid}\n"
         f"Requested EMNT: {amt}\n"
         f"Required USDT: {required_usdt}\n\n"
-        f"Deposit Address:\n{masked}\n\n"
-        f"Full Deposit Address:\n{DEPOSIT_ADDRESS}\n\n"
+        f"Deposit Address:\n{DEPOSIT_ADDRESS}\n\n"
         f"Address Chain: {CHAIN_NAME}\n\n"
-        "Now send your real blockchain hash id directly in chat.\n"
-        "You do not need to type any command."
+        "Now send your real blockchain hash id directly in chat."
     )
 
 
@@ -263,7 +254,6 @@ async def capture_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_data = db["users"][uid]
 
-    # WITHDRAW STEP 1: wallet address
     if user_data["state"] == "withdraw_wallet":
         user_data["temp_wallet"] = text
         user_data["state"] = "withdraw_amount"
@@ -277,11 +267,10 @@ async def capture_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # WITHDRAW STEP 2: amount
     if user_data["state"] == "withdraw_amount":
         try:
             amt = float(text)
-        except:
+        except Exception:
             await update.message.reply_text("Invalid amount. Please send a number.")
             return
 
@@ -298,8 +287,8 @@ async def capture_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         wallet = user_data["temp_wallet"]
-
         rid = len(db["withdraw"]) + 1
+
         db["withdraw"].append({
             "id": rid,
             "u": uid,
@@ -330,24 +319,20 @@ async def capture_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         ])
 
-        try:
-            await context.bot.send_message(
-                chat_id=int(ADMIN_ID),
-                text=(
-                    f"WITHDRAW APPROVAL REQUIRED\n\n"
-                    f"Request ID: {rid}\n"
-                    f"User ID: {uid}\n"
-                    f"Wallet Address: {wallet}\n"
-                    f"Amount: {amt}\n"
-                    f"Chain: {CHAIN_NAME}"
-                ),
-                reply_markup=keyboard
-            )
-        except Exception as e:
-            await update.message.reply_text(f"Admin message failed: {e}")
+        await context.bot.send_message(
+            chat_id=int(ADMIN_ID),
+            text=(
+                f"WITHDRAW APPROVAL REQUIRED\n\n"
+                f"Request ID: {rid}\n"
+                f"User ID: {uid}\n"
+                f"Wallet Address: {wallet}\n"
+                f"Amount: {amt}\n"
+                f"Chain: {CHAIN_NAME}"
+            ),
+            reply_markup=keyboard
+        )
         return
 
-    # HASH CAPTURE FOR BUY
     latest = get_latest_pending_buy(uid)
     if latest is None:
         return
@@ -378,22 +363,19 @@ async def capture_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
     ])
 
-    try:
-        await context.bot.send_message(
-            chat_id=int(ADMIN_ID),
-            text=(
-                f"BUY APPROVAL REQUIRED\n\n"
-                f"Request ID: {latest['id']}\n"
-                f"User ID: {uid}\n"
-                f"Requested EMNT: {latest['amt']}\n"
-                f"Required USDT: {latest['usdt']}\n"
-                f"Hash ID: {txid}\n"
-                f"Chain: {CHAIN_NAME}"
-            ),
-            reply_markup=keyboard
-        )
-    except Exception as e:
-        await update.message.reply_text(f"Admin message failed: {e}")
+    await context.bot.send_message(
+        chat_id=int(ADMIN_ID),
+        text=(
+            f"BUY APPROVAL REQUIRED\n\n"
+            f"Request ID: {latest['id']}\n"
+            f"User ID: {uid}\n"
+            f"Requested EMNT: {latest['amt']}\n"
+            f"Required USDT: {latest['usdt']}\n"
+            f"Hash ID: {txid}\n"
+            f"Chain: {CHAIN_NAME}"
+        ),
+        reply_markup=keyboard
+    )
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -420,7 +402,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         commission_text = ""
 
         if referrer:
-            ensure_user(referrer)
+            ensure_user(int(referrer))
             commission = (r["amt"] * REF_BUY_COMMISSION_PERCENT) / 100
             db["users"][referrer]["bal"] += commission
             commission_text = f"\nReferrer Commission: {commission} EMNT"
@@ -436,7 +418,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"Your Commission: {commission} EMNT"
                     )
                 )
-            except:
+            except Exception:
                 pass
 
         r["s"] = "approved"

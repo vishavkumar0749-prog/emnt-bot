@@ -17,13 +17,14 @@ from telegram.ext import (
 TOKEN = "8693628855:AAGFIErbyJVsUI9PxD0hozZhv_q8R66kGj4"
 ADMIN_ID = 8593936230
 
-DEPOSIT_ADDRESS = "3emTg6qi7aXiiRNRvG75Bo6HDgPXnF32WnyPNoPjGURM"
+DEPOSIT_ADDRESS = "3emTg6qi7aXiiRNRvG75Bo6..."
 CHAIN_NAME = "Solana"
 
 MAX_LIMIT = 500000000
 REF_BONUS = 0.1
 REF_BUY_COMMISSION_PERCENT = 5
 FILE_NAME = "data.json"
+
 
 def load_data():
     if os.path.exists(FILE_NAME):
@@ -35,11 +36,14 @@ def load_data():
         "withdraw": []
     }
 
+
 def save_data():
     with open(FILE_NAME, "w", encoding="utf-8") as f:
         json.dump(db, f, ensure_ascii=False, indent=2)
 
+
 db = load_data()
+
 
 def ensure_user(uid):
     uid = str(uid)
@@ -54,10 +58,12 @@ def ensure_user(uid):
         save_data()
     return uid
 
+
 def mask_address(addr):
     if len(addr) <= 12:
         return addr
     return addr[:6] + "......" + addr[-6:]
+
 
 def get_latest_pending_buy(uid):
     uid = str(uid)
@@ -66,17 +72,20 @@ def get_latest_pending_buy(uid):
         return None
     return sorted(pending, key=lambda x: x["id"], reverse=True)[0]
 
+
 def find_buy_request(rid):
     for r in db["buy"]:
         if r["id"] == rid:
             return r
     return None
 
+
 def find_withdraw_request(rid):
     for r in db["withdraw"]:
         if r["id"] == rid:
             return r
     return None
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = ensure_user(update.effective_user.id)
@@ -104,11 +113,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/myrequests - View your requests"
     )
 
+
 async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = ensure_user(update.effective_user.id)
     u = db["users"][uid]
     emnt_balance = u["bal"]
-    usdt_value = emnt_balance * 1
+    usdt_value = emnt_balance * 0.5
 
     await update.message.reply_text(
         "EMNT Pre-Sale\n"
@@ -117,6 +127,7 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Equal To: {usdt_value} USDT\n"
         f"Referrals: {u['ref']}"
     )
+
 
 async def refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = ensure_user(update.effective_user.id)
@@ -131,32 +142,25 @@ async def refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Buy Commission: {REF_BUY_COMMISSION_PERCENT}%"
     )
 
+
 async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     masked = mask_address(DEPOSIT_ADDRESS)
-
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                text="Copy Deposit Address",
-                copy_text=CopyTextButton(DEPOSIT_ADDRESS)
-            )
-        ]
-    ])
 
     await update.message.reply_text(
         "EMNT Pre-Sale\n"
         "First Phase\n\n"
         "Buy EMNT\n"
-        "Price: 1 EMNT = 1 USDT\n"
+        "Price: 1 EMNT = 0.5 USDT\n"
         "Maximum Buy Limit: 50,00,00,000 EMNT\n\n"
         f"Deposit Address:\n{masked}\n\n"
+        f"Full Deposit Address:\n{DEPOSIT_ADDRESS}\n\n"
         f"Address Chain: {CHAIN_NAME}\n\n"
         "Step 1:\n"
         "/buyrequest amount\n\n"
         "Step 2:\n"
-        "After payment, just send your real blockchain hash id directly in chat",
-        reply_markup=keyboard
+        "After payment, just send your real blockchain hash id directly in chat"
     )
+
 
 async def buyrequest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = ensure_user(update.effective_user.id)
@@ -179,25 +183,20 @@ async def buyrequest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Maximum buy limit is 50,00,00,000 EMNT")
         return
 
+    required_usdt = amt * 0.5
+
     rid = len(db["buy"]) + 1
     db["buy"].append({
         "id": rid,
         "u": uid,
         "amt": amt,
+        "usdt": required_usdt,
         "tx": "",
         "s": "pending_payment"
     })
     save_data()
 
     masked = mask_address(DEPOSIT_ADDRESS)
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                text="Copy Deposit Address",
-                copy_text=CopyTextButton(DEPOSIT_ADDRESS)
-            )
-        ]
-    ])
 
     await update.message.reply_text(
         "EMNT Pre-Sale\n"
@@ -205,13 +204,14 @@ async def buyrequest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Buy Request Created\n"
         f"Request ID: {rid}\n"
         f"Requested EMNT: {amt}\n"
-        f"Required USDT: {amt}\n\n"
+        f"Required USDT: {required_usdt}\n\n"
         f"Deposit Address:\n{masked}\n\n"
+        f"Full Deposit Address:\n{DEPOSIT_ADDRESS}\n\n"
         f"Address Chain: {CHAIN_NAME}\n\n"
         "Now send your real blockchain hash id directly in chat.\n"
-        "You do not need to type any command.",
-        reply_markup=keyboard
+        "You do not need to type any command."
     )
+
 
 async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = ensure_user(update.effective_user.id)
@@ -226,6 +226,7 @@ async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Please send your SOL chain wallet address."
     )
 
+
 async def myrequests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = str(update.effective_user.id)
 
@@ -234,7 +235,7 @@ async def myrequests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for r in db["buy"]:
         if r["u"] == uid:
             buy_found = True
-            text += f"ID {r['id']} | {r['amt']} | {r['s']}\n"
+            text += f"ID {r['id']} | {r['amt']} EMNT | {r['s']}\n"
     if not buy_found:
         text += "No buy requests\n"
 
@@ -243,11 +244,12 @@ async def myrequests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for r in db["withdraw"]:
         if r["u"] == uid:
             wd_found = True
-            text += f"ID {r['id']} | {r['amt']} | {r['s']}\n"
+            text += f"ID {r['id']} | {r['amt']} EMNT | {r['s']}\n"
     if not wd_found:
         text += "No withdraw requests\n"
 
     await update.message.reply_text(text)
+
 
 async def capture_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -384,7 +386,7 @@ async def capture_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"Request ID: {latest['id']}\n"
                 f"User ID: {uid}\n"
                 f"Requested EMNT: {latest['amt']}\n"
-                f"Required USDT: {latest['amt']}\n"
+                f"Required USDT: {latest['usdt']}\n"
                 f"Hash ID: {txid}\n"
                 f"Chain: {CHAIN_NAME}"
             ),
@@ -392,6 +394,7 @@ async def capture_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         await update.message.reply_text(f"Admin message failed: {e}")
+
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -505,17 +508,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("balance", balance))
-app.add_handler(CommandHandler("refer", refer))
-app.add_handler(CommandHandler("buy", buy))
-app.add_handler(CommandHandler("buyrequest", buyrequest))
-app.add_handler(CommandHandler("withdraw", withdraw))
-app.add_handler(CommandHandler("myrequests", myrequests))
-app.add_handler(CallbackQueryHandler(button_handler))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, capture_text))
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
 
-print("Bot running...")
-app.run_polling()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("balance", balance))
+    app.add_handler(CommandHandler("refer", refer))
+    app.add_handler(CommandHandler("buy", buy))
+    app.add_handler(CommandHandler("buyrequest", buyrequest))
+    app.add_handler(CommandHandler("withdraw", withdraw))
+    app.add_handler(CommandHandler("myrequests", myrequests))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, capture_text))
+
+    print("Bot running...")
+    app.run_polling(drop_pending_updates=True)
+
+
+if __name__ == "__main__":
+    main()
